@@ -2,17 +2,17 @@
 """
  Evaluation functions
 """
-import logging
 import numpy as np
-from sklearn.cluster import AgglomerativeClustering, KMeans
-from .datasets.similarity import fetch_MEN, fetch_WS353, fetch_SimLex999, fetch_MTurk, fetch_RG65, fetch_RW, fetch_TR9856
-from .datasets.categorization import fetch_AP, fetch_battig, fetch_BLESS, fetch_ESSLI_1a, fetch_ESSLI_2b, \
-    fetch_ESSLI_2c
-from web.analogy import *
+import torch
 from six import iteritems
+from sklearn.cluster import AgglomerativeClustering, KMeans
+
+from web.analogy import *
 from web.embedding import Embedding
+from .datasets.similarity import fetch_MEN, fetch_WS353, fetch_SimLex999, fetch_MTurk, fetch_RG65, fetch_RW
 
 logger = logging.getLogger(__name__)
+
 
 def calculate_purity(y_true, y_pred):
     """
@@ -112,7 +112,6 @@ def evaluate_categorization(w, X, y, method="all", seed=None):
         best_purity = max(purity, best_purity)
 
     return best_purity
-
 
 
 def evaluate_on_semeval_2012_2(w):
@@ -331,11 +330,88 @@ def evaluate_similarity(w, X, y):
     if missing_words > 0:
         logger.warning("Missing {} words. Will replace them with mean vector".format(missing_words))
 
-
     mean_vector = np.mean(w.vectors, axis=0, keepdims=True)
-    A = np.vstack(w.get(word, mean_vector) for word in X[:, 0])
-    B = np.vstack(w.get(word, mean_vector) for word in X[:, 1])
-    scores = np.array([v1.dot(v2.T)/(np.linalg.norm(v1)*np.linalg.norm(v2)) for v1, v2 in zip(A, B)])
+    x1 = []
+    for i in X[:, 0]:
+        l = []
+        for j in i.split(' '):
+            l.append(w.get(j, mean_vector))
+        x1.append(np.mean(l, axis=0))
+    A = np.vstack(x1)
+    x2 = []
+    for i in X[:, 1]:
+        l = []
+        for j in i.split(' '):
+            l.append(w.get(j, mean_vector))
+        x2.append(np.mean(l, axis=0))
+    B = np.vstack(x2)
+
+    # A = np.vstack(w.get(word, mean_vector) for word in X[:, 0])
+    # B = np.vstack(w.get(word, mean_vector) for word in X[:, 1])
+    scores = np.array([v1.dot(v2.T) / (np.linalg.norm(v1) * np.linalg.norm(v2)) for v1, v2 in zip(A, B)])
+    return scipy.stats.spearmanr(scores, y).correlation
+
+
+def get_word_idx(sent: str, word: str):
+    return sent.split(" ").index(word)
+
+
+def get_hidden_states(encoded, token_ids_word, model):
+    """Push input IDs through model. Stack and sum `layers` (last four by default).
+       Select only those subword token outputs that belong to our word of interest
+       and average them."""
+    with torch.no_grad():
+        output = model(**encoded)
+    states = output['last_hidden_state']
+    word_tokens_output = states[0][token_ids_word]
+    return word_tokens_output
+
+
+def get_word_vector(sent, idx, tokenizer, model):
+    """Get a word vector by first tokenizing the input sentence, getting all token idxs
+       that make up the word of interest, and then `get_hidden_states`."""
+    encoded = tokenizer.encode_plus(sent, return_tensors="pt")
+    # get all token idxs that belong to the word of interest
+    return get_hidden_states(encoded, idx, model)
+
+
+def evaluate_similarity_bert(model, tokenizer, X, y):
+    """
+    Calculate Spearman correlation between cosine similarity of the model
+    and human rated similarity of word pairs
+
+    Parameters
+    ----------
+    w : Embedding or dict
+      Embedding or dict instance.
+
+    X: array, shape: (n_samples, 2)
+      Word pairs
+
+    y: vector, shape: (n_samples,)
+      Human ratings
+
+    Returns
+    -------
+    cor: float
+      Spearman correlation
+    """
+    print("")
+    x1 = []
+    for i in X[:, 0]:
+        l = []
+        for j in i.split(' '):
+            l.append(get_word_vector(i, get_word_idx(i, j), tokenizer, model).numpy())
+        x1.append(np.mean(l, axis=0))
+    A = np.vstack(x1)
+    x2 = []
+    for i in X[:, 1]:
+        l = []
+        for j in i.split(' '):
+            l.append(get_word_vector(i, get_word_idx(i, j), tokenizer, model).numpy())
+        x2.append(np.mean(l, axis=0))
+    B = np.vstack(x2)
+    scores = np.array([v1.dot(v2.T) / (np.linalg.norm(v1) * np.linalg.norm(v2)) for v1, v2 in zip(A, B)])
     return scipy.stats.spearmanr(scores, y).correlation
 
 
@@ -375,44 +451,7 @@ def evaluate_on_all(w):
         similarity_results[name] = evaluate_similarity(w, data.X, data.y)
         logger.info("Spearman correlation of scores on {} {}".format(name, similarity_results[name]))
 
-    # Calculate results on analogy
-    logger.info("Calculating analogy benchmarks")
-    analogy_tasks = {
-        "Google": fetch_google_analogy(),
-        "MSR": fetch_msr_analogy()
-    }
-
-    analogy_results = {}
-
-    for name, data in iteritems(analogy_tasks):
-        analogy_results[name] = evaluate_analogy(w, data.X, data.y)
-        logger.info("Analogy prediction accuracy on {} {}".format(name, analogy_results[name]))
-
-    analogy_results["SemEval2012_2"] = evaluate_on_semeval_2012_2(w)['all']
-    logger.info("Analogy prediction accuracy on {} {}".format("SemEval2012", analogy_results["SemEval2012_2"]))
-
-    # Calculate results on categorization
-    logger.info("Calculating categorization benchmarks")
-    categorization_tasks = {
-        "AP": fetch_AP(),
-        "BLESS": fetch_BLESS(),
-        "Battig": fetch_battig(),
-        "ESSLI_2c": fetch_ESSLI_2c(),
-        "ESSLI_2b": fetch_ESSLI_2b(),
-        "ESSLI_1a": fetch_ESSLI_1a()
-    }
-
-    categorization_results = {}
-
-    # Calculate results using helper function
-    for name, data in iteritems(categorization_tasks):
-        categorization_results[name] = evaluate_categorization(w, data.X, data.y)
-        logger.info("Cluster purity on {} {}".format(name, categorization_results[name]))
-
-    # Construct pd table
-    cat = pd.DataFrame([categorization_results])
-    analogy = pd.DataFrame([analogy_results])
     sim = pd.DataFrame([similarity_results])
-    results = cat.join(sim).join(analogy)
+    results = sim
 
     return results

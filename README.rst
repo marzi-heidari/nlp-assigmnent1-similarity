@@ -79,9 +79,11 @@ You can also install it in development mode with::
     python setup.py develop
 
 
-Examples
+For Assignment 1
 ========
-See `examples` folder.
+* run ``evaluate_similarity.py`` for evaluating all datasets and all embeddings except BERT.
+
+* run ``evaluate_bert.py`` for evaluating all datasets on BERT embedding.
 
 License
 =======

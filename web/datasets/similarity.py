@@ -8,7 +8,8 @@ import os
 
 import numpy as np
 import pandas as pd
-from sklearn.datasets.base import Bunch
+from sklearn.datasets._base import Bunch
+from transformers import AutoTokenizer, AutoModel
 
 from .utils import _get_as_pd, _fetch_file
 
@@ -209,6 +210,7 @@ def fetch_RW():
     return Bunch(X=data[:, 0:2].astype("object"),
                  y=data[:, 2].astype(np.float),
                  sd=np.std(data[:, 3:].astype(np.float)))
+
 
 
 def fetch_multilingual_SimLex999(which="EN"):
