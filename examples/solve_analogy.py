@@ -34,10 +34,10 @@ for analogy in data:
     print("ANALOGY DATASET-", analogy)
     for e in embeddings:
         id = 50
-        w1, w2, w3 = data.X[id][0], data.X[id][1], data.X[id][2]
+        w1, w2, w3 = data[analogy].X[id][0], data[analogy].X[id][1], data[analogy].X[id][2]
         print("Question: {} is to {} as {} is to ?".format(w1, w2, w3))
-        print("Answer: " + data.y[id])
+        print("Answer: " + data[analogy].y[id])
         w = embeddings[e]
         # print("Predicted: " + " ".join(w.nearest_neighbors(w[w2] - w[w1] + w[w3], exclude=[w1, w2, w3])))
-        a = evaluate_analogy(w, data.X, data.y)
+        a = evaluate_analogy(w, data[analogy].X, data[analogy].y)
         print("---------------------Accuracy---------------------", e, a)
