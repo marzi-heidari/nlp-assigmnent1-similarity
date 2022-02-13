@@ -374,6 +374,68 @@ def get_word_vector(sent, idx, tokenizer, model):
     # get all token idxs that belong to the word of interest
     return get_hidden_states(encoded, idx, model)
 
+def evaluate_bert_analogy(model, tokenizer, X, y, method="add", k=None, category=None, batch_size=100):
+
+    """
+    Simple method to score embedding using SimpleAnalogySolver
+
+    Parameters
+    ----------
+    w : Embedding or dict
+      Embedding or dict instance.
+
+    method : {"add", "mul"}
+      Method to use when finding analogy answer, see "Improving Distributional Similarity
+      with Lessons Learned from Word Embeddings"
+
+    X : array-like, shape (n_samples, 3)
+      Analogy questions.
+
+    y : array-like, shape (n_samples, )
+      Analogy answers.
+
+    k : int, default: None
+      If not None will select k top most frequent words from embedding
+
+    batch_size : int, default: 100
+      Increase to increase memory consumption and decrease running time
+
+    category : list, default: None
+      Category of each example, if passed function returns accuracy per category
+      in addition to the overall performance.
+      Analogy datasets have "category" field that can be supplied here.
+
+    Returns
+    -------
+    result: dict
+      Results, where each key is for given category and special empty key "" stores
+      summarized accuracy across categories
+    """
+    # if isinstance(w, dict):
+    #     w = Embedding.from_dict(w)
+
+    assert category is None or len(category) == y.shape[0], "Passed incorrect category list"
+    i=0
+    j=0
+    w = get_word_vector(i, get_word_idx(i, j), tokenizer, model).numpy()
+    solver = SimpleAnalogySolver(w=w, method=method, batch_size=batch_size, k=k)
+    y_pred = solver.predict(X)
+
+    if category is not None:
+        results = OrderedDict({"all": np.mean(y_pred == y)})
+        count = OrderedDict({"all": len(y_pred)})
+        correct = OrderedDict({"all": np.sum(y_pred == y)})
+        for cat in set(category):
+            results[cat] = np.mean(y_pred[category == cat] == y[category == cat])
+            count[cat] = np.sum(category == cat)
+            correct[cat] = np.sum(y_pred[category == cat] == y[category == cat])
+
+        return pd.concat([pd.Series(results, name="accuracy"),
+                          pd.Series(correct, name="correct"),
+                          pd.Series(count, name="count")],
+                         axis=1)
+    else:
+        return np.mean(y_pred == y)
 
 def evaluate_similarity_bert(model, tokenizer, X, y):
     """
