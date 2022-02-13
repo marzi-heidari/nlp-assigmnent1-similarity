@@ -16,8 +16,8 @@ def main():
         "SIMLEX999": fetch_SimLex999(),
         "TR9856": fetch_TR9856()
     }
-    tokenizer =RobertaTokenizer.from_pretrained("roberta-base")
-    model = RobertaModel.from_pretrained("roberta-base", output_hidden_states=True)
+    tokenizer =BertTokenizer.from_pretrained("bert-base-cased")
+    model = BertModel.from_pretrained("bert-base-cased", output_hidden_states=True)
     for name, data in tasks.items():
         print("Spearman correlation of scores on {} using {} {}".format(name, 'Bert',
                                                                         evaluate_similarity_bert(model, tokenizer,
