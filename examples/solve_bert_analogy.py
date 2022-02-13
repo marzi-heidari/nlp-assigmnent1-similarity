@@ -6,6 +6,7 @@
 """
 import logging
 import numpy as np
+from web.analogy import *
 from web.datasets.analogy import fetch_google_analogy, fetch_msr_analogy
 from transformers import AutoTokenizer, AutoModel, BertModel, BertTokenizer, RobertaTokenizer, RobertaModel
 # from web.evaluate import evaluate_bert_analogy
