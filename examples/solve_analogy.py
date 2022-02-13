@@ -5,7 +5,7 @@
 """
 import logging
 from web.datasets.analogy import fetch_google_analogy, fetch_msr_analogy
-from web.embeddings import fetch_HDC, fetch_SG_GoogleNews, fetch_GloVe, fetch_conceptnet_numberbatch
+from web.embeddings import fetch_HDC,fetch_PDC,fetch_FastText,fetch_LexVec,  fetch_SG_GoogleNews, fetch_GloVe, fetch_conceptnet_numberbatch
 from web.evaluate import evaluate_analogy
 # Configure logging
 logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s', level=logging.DEBUG, datefmt='%I:%M:%S')
@@ -16,7 +16,8 @@ embeddings = {
     'glove': fetch_GloVe(corpus="wiki-6B", dim=300),
     'HDC': fetch_HDC(),
     'google_news': fetch_SG_GoogleNews(lower=True),
-    'conceptnet_numberbatch': fetch_conceptnet_numberbatch()
+    'conceptnet_numberbatch': fetch_conceptnet_numberbatch(),
+    'PDC': fetch_PDC()
 }
 
 # Fetch analogy dataset
