@@ -9,5 +9,5 @@ seaborn>=0.6.0
 futures
 tqdm
 docopt
-pytorch
+torch
 transformers
